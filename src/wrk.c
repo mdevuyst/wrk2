@@ -23,6 +23,7 @@ static struct config {
     bool     record_all_responses;
     bool     no_script_response_body;
     char    *host;
+    char    *connect_to;
     char    *script;
     enum TlsVersion tls_version;
     SSL_CTX *ctx;
@@ -70,6 +71,7 @@ static void usage() {
            "        --tls1.1      <N>  Use only TLS version 1.1   \n"
            "        --tls1.2      <N>  Use only TLS version 1.2   \n"
            "        --tls1.3      <N>  Use only TLS version 1.3   \n"
+           "    -C --connect-to   <S> Connect to this host/IP     \n"
            "    -B, --batch_latency    Measure latency of whole   \n"
            "                           batches of pipelined ops   \n"
            "                           (as opposed to each op)    \n"
@@ -98,6 +100,7 @@ int main(int argc, char **argv) {
     char *host    = copy_url_part(url, &parts, UF_HOST);
     char *port    = copy_url_part(url, &parts, UF_PORT);
     char *service = port ? port : schema;
+    char *connect_to = cfg.connect_to ? cfg.connect_to : host;
 
     if (!strncmp("https", schema, 5)) {
         if ((cfg.ctx = ssl_init(cfg.tls_version)) == NULL) {
@@ -125,7 +128,7 @@ int main(int argc, char **argv) {
 
 
     lua_State *L = script_create(cfg.script, url, headers);
-    if (!script_resolve(L, host, service)) {
+    if (!script_resolve(L, connect_to, service)) {
         char *msg = strerror(errno);
         fprintf(stderr, "unable to connect to %s:%s %s\n", host, service, msg);
         exit(1);
@@ -743,6 +746,7 @@ static struct option longopts[] = {
     { "tls1.1",              no_argument,  NULL, 'x' },
     { "tls1.2",              no_argument,  NULL, 'y' },
     { "tls1.3",              no_argument,  NULL, 'z' },
+    { "connect-to",    required_argument,  NULL, 'C' },
     { "help",                no_argument,  NULL, 'h' },
     { "version",             no_argument,  NULL, 'v' },
     { "rate",           required_argument, NULL, 'R' },
@@ -762,7 +766,7 @@ static int parse_args(struct config *cfg, char **url, struct http_parser_url *pa
     cfg->record_all_responses = true;
     cfg->no_script_response_body = false;
 
-    while ((c = getopt_long(argc, argv, "t:c:d:s:H:T:xyzR:LUBNrv?", longopts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "t:c:d:s:H:T:xyzC:R:LUBNrv?", longopts, NULL)) != -1) {
         switch (c) {
             case 't':
                 if (scan_metric(optarg, &cfg->threads)) return -1;
@@ -804,6 +808,9 @@ static int parse_args(struct config *cfg, char **url, struct http_parser_url *pa
                 break;
             case 'z':
                 cfg->tls_version = TLS_1_3;
+                break;
+            case 'C':
+                cfg->connect_to = optarg;
                 break;
             case 'R':
                 if (scan_metric(optarg, &cfg->rate)) return -1;
