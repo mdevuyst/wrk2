@@ -71,7 +71,7 @@ static void usage() {
            "        --tls1.1      <N>  Use only TLS version 1.1   \n"
            "        --tls1.2      <N>  Use only TLS version 1.2   \n"
            "        --tls1.3      <N>  Use only TLS version 1.3   \n"
-           "    -C --connect-to   <S> Connect to this host/IP     \n"
+           "    -C, --connect-to  <S> Connect to this host/IP     \n"
            "    -B, --batch_latency    Measure latency of whole   \n"
            "                           batches of pipelined ops   \n"
            "                           (as opposed to each op)    \n"
