@@ -24,6 +24,7 @@ static struct config {
     bool     no_script_response_body;
     char    *host;
     char    *script;
+    enum TlsVersion tls_version;
     SSL_CTX *ctx;
 } cfg;
 
@@ -66,6 +67,9 @@ static void usage() {
            "    -L  --latency          Print latency statistics   \n"
            "    -U  --u_latency        Print uncorrected latency statistics\n"
            "        --timeout     <T>  Socket/request timeout     \n"
+           "        --tls1.1      <N>  Use only TLS version 1.1   \n"
+           "        --tls1.2      <N>  Use only TLS version 1.2   \n"
+           "        --tls1.3      <N>  Use only TLS version 1.3   \n"
            "    -B, --batch_latency    Measure latency of whole   \n"
            "                           batches of pipelined ops   \n"
            "                           (as opposed to each op)    \n"
@@ -96,7 +100,7 @@ int main(int argc, char **argv) {
     char *service = port ? port : schema;
 
     if (!strncmp("https", schema, 5)) {
-        if ((cfg.ctx = ssl_init()) == NULL) {
+        if ((cfg.ctx = ssl_init(cfg.tls_version)) == NULL) {
             fprintf(stderr, "unable to initialize SSL\n");
             ERR_print_errors_fp(stderr);
             exit(1);
@@ -107,9 +111,9 @@ int main(int argc, char **argv) {
         sock.write    = ssl_write;
         sock.readable = ssl_readable;
     }
-	
+
     cfg.host = host;
-	
+
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT,  SIG_IGN);
 
@@ -126,7 +130,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "unable to connect to %s:%s %s\n", host, service, msg);
         exit(1);
     }
-    
+
     uint64_t connections = cfg.connections / cfg.threads;
     double throughput    = (double)cfg.rate / cfg.threads;
 
@@ -736,6 +740,9 @@ static struct option longopts[] = {
     { "batch_latency",       no_argument,  NULL, 'B' },
     { "lua-dont-pass-body",  no_argument,  NULL, 'N' },
     { "timeout",        required_argument, NULL, 'T' },
+    { "tls1.1",              no_argument,  NULL, 'x' },
+    { "tls1.2",              no_argument,  NULL, 'y' },
+    { "tls1.3",              no_argument,  NULL, 'z' },
     { "help",                no_argument,  NULL, 'h' },
     { "version",             no_argument,  NULL, 'v' },
     { "rate",           required_argument, NULL, 'R' },
@@ -750,11 +757,12 @@ static int parse_args(struct config *cfg, char **url, struct http_parser_url *pa
     cfg->connections = 10;
     cfg->duration    = 10;
     cfg->timeout     = SOCKET_TIMEOUT_MS;
+    cfg->tls_version = TLS_AUTOMATIC;
     cfg->rate        = 0;
     cfg->record_all_responses = true;
     cfg->no_script_response_body = false;
 
-    while ((c = getopt_long(argc, argv, "t:c:d:s:H:T:R:LUBNrv?", longopts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "t:c:d:s:H:T:xyzR:LUBNrv?", longopts, NULL)) != -1) {
         switch (c) {
             case 't':
                 if (scan_metric(optarg, &cfg->threads)) return -1;
@@ -787,6 +795,15 @@ static int parse_args(struct config *cfg, char **url, struct http_parser_url *pa
             case 'T':
                 if (scan_time(optarg, &cfg->timeout)) return -1;
                 cfg->timeout *= 1000;
+                break;
+            case 'x':
+                cfg->tls_version = TLS_1_1;
+                break;
+            case 'y':
+                cfg->tls_version = TLS_1_2;
+                break;
+            case 'z':
+                cfg->tls_version = TLS_1_3;
                 break;
             case 'R':
                 if (scan_metric(optarg, &cfg->rate)) return -1;
